@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import * as THREE from "three";
-import { OrbitControls as OrbitControlsImpl } from "three/examples/jsm/Addons.js";
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import gsap from "gsap";
-import { Perf } from "r3f-perf";
+// import { Perf } from "r3f-perf";
 
 import { BackgroundParticles } from "./background-particles";
 import { AnomalyObject } from "./anomaly-object";
@@ -13,21 +12,14 @@ import useAudioStore from "../lib/audio";
 import { useMessage } from "../lib/store/message";
 
 export function Experience() {
-  const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const { defaultCameraPosition, zoomedCameraPosition } = useThreeObject();
   const { setTerminalMessage } = useMessage();
   const { zoomIn } = useAudioStore();
   const { camera } = useThree();
-  const { setControlsRef } = useThreeObject();
-
-  useEffect(() => {
-    setControlsRef(controlsRef);
-  }, [setControlsRef]);
+  const { controlEnabled } = useThreeObject();
 
   useEffect(() => {
     const { x, y, z } = zoomIn ? zoomedCameraPosition : defaultCameraPosition;
-    console.log(x, y, z);
-
     gsap.to(camera.position, {
       x,
       y,
@@ -59,15 +51,7 @@ export function Experience() {
 
   return (
     <>
-      <Perf />
-      <PerspectiveCamera
-        makeDefault
-        aspect={window.innerWidth / window.innerHeight}
-        fov={60}
-        near={0.1}
-        far={1000}
-        position={defaultCameraPosition}
-      />
+      {/* <Perf /> */}
       <ambientLight color={0x404040} intensity={1.5} />
       <directionalLight color={0xffffff} intensity={1.5} position={[1, 1, 1]} />
       <pointLight args={[0xff4e42, 1, 10]} position={[2, 2, 2]} />
@@ -82,7 +66,6 @@ export function Experience() {
       <BackgroundParticles />
       <AnomalyObject />
       <OrbitControls
-        ref={setControlsRef}
         enableDamping
         dampingFactor={0.1}
         rotateSpeed={0.5}
@@ -91,6 +74,7 @@ export function Experience() {
         minDistance={3}
         maxDistance={30}
         enableZoom={false}
+        enabled={controlEnabled}
       />
     </>
   );

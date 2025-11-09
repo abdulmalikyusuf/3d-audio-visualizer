@@ -7,10 +7,10 @@ export function WaveformVisualizers() {
   const animationFrameId = useRef<number>(null);
 
   const { isAudioPlaying, audioAnalyser, audioData } = useAudioStore(
-    useShallow((state) => ({
-      audioAnalyser: state.audioAnalyser,
-      audioData: state.audioData,
-      isAudioPlaying: state.isAudioPlaying,
+    useShallow((s) => ({
+      audioAnalyser: s.audioAnalyser,
+      audioData: s.audioData,
+      isAudioPlaying: s.isAudioPlaying,
     }))
   );
 

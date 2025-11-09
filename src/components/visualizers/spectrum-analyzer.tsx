@@ -9,11 +9,11 @@ export function SpectrumAnalyzer() {
 
   const { isAudioPlaying, audioAnalyser, audioData, frequencyData } =
     useAudioStore(
-      useShallow((state) => ({
-        audioAnalyser: state.audioAnalyser,
-        frequencyData: state.frequencyData,
-        audioData: state.audioData,
-        isAudioPlaying: state.isAudioPlaying,
+      useShallow((s) => ({
+        audioAnalyser: s.audioAnalyser,
+        frequencyData: s.frequencyData,
+        audioData: s.audioData,
+        isAudioPlaying: s.isAudioPlaying,
       }))
     );
 
@@ -40,7 +40,7 @@ export function SpectrumAnalyzer() {
   // Spectrum Analyzer
   useEffect(() => {
     const canvas = spectrumCanvasRef.current;
-    if (!canvas || !audioAnalyser) return;
+    if (!canvas || !audioAnalyser || !frequencyData) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -48,7 +48,7 @@ export function SpectrumAnalyzer() {
       const width = canvas.width;
       const height = canvas.height;
       ctx.clearRect(0, 0, width, height);
-      audioAnalyser.getByteFrequencyData(frequencyData);
+      audioAnalyser.getByteFrequencyData(frequencyData as Uint8Array<ArrayBuffer>);
       const barWidth = width / 256;
       let x = 0;
       for (let i = 0; i < 256; i++) {
@@ -100,6 +100,7 @@ export function SpectrumAnalyzer() {
     audioSensitivity,
   ]);
 
+  if (!isAudioPlaying) return null;
   return (
     <div className="spectrum-content">
       <canvas

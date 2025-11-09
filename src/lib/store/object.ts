@@ -1,9 +1,5 @@
 import * as THREE from "three";
 import { create } from "zustand";
-import { combine } from "zustand/middleware";
-import { OrbitControls } from "@react-three/drei";
-
-type OrbitControlsType = React.ComponentRef<typeof OrbitControls>;
 
 interface ThreeObjectState {
   isDraggingAnomaly: boolean;
@@ -12,31 +8,28 @@ interface ThreeObjectState {
   anomalyOriginalPosition: THREE.Vector3;
   defaultCameraPosition: THREE.Vector3;
   zoomedCameraPosition: THREE.Vector3;
-  controlsRef: OrbitControlsType | null;
+  controlEnabled: boolean;
   anomalyObjectPosition: THREE.Vector3 | null;
 }
 
 interface ThreeObjectActions {
   setThreeObjectState: (newState: Partial<ThreeObjectState>) => void;
-  setControlsRef: (ref: OrbitControlsType | null) => void;
+  disableControls: () => void;
+  enableControls: () => void;
 }
 
-export const useThreeObject = create<ThreeObjectState & ThreeObjectActions>(
-  combine(
-    {
-      isDraggingAnomaly: false,
-      anomalyVelocity: new THREE.Vector2(0, 0),
-      anomalyTargetPosition: new THREE.Vector3(0, 0, 0),
-      anomalyOriginalPosition: new THREE.Vector3(0, 0, 0),
-      defaultCameraPosition: new THREE.Vector3(0, 0, 10),
-      zoomedCameraPosition: new THREE.Vector3(0, 0, 7),
-      controlsRef: null,
-      anomalyObjectPosition: null,
-    },
-    (set): ThreeObjectActions => ({
-      setThreeObjectState: (newState: Partial<ThreeObjectState>) =>
-        set(newState),
-      setControlsRef: (ref) => set({ controlsRef: ref }),
-    })
-  )
-);
+type ThreeObjectStore = ThreeObjectState & ThreeObjectActions;
+export const useThreeObject = create<ThreeObjectStore>((set) => ({
+  isDraggingAnomaly: false,
+  anomalyVelocity: new THREE.Vector2(0, 0),
+  anomalyTargetPosition: new THREE.Vector3(0, 0, 0),
+  anomalyOriginalPosition: new THREE.Vector3(0, 0, 0),
+  defaultCameraPosition: new THREE.Vector3(0, 0, 10),
+  zoomedCameraPosition: new THREE.Vector3(0, 0, 7),
+  controlEnabled: true,
+  anomalyObjectPosition: null,
+
+  setThreeObjectState: (newState: Partial<ThreeObjectState>) => set(newState),
+  disableControls: () => set({ controlEnabled: false }),
+  enableControls: () => set({ controlEnabled: true }),
+}));

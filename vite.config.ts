@@ -7,11 +7,15 @@ import checker from "vite-plugin-checker";
 export default defineConfig({
   plugins: [
     react(),
-    glsl(),
     checker({
       typescript: {
         buildMode: false, // Ensure it runs during build in development
       },
+    }),
+    glsl({
+      include: ["**/*.glsl", "**/*.vert", "**/*.frag"],
+      minify: true,
+      importKeyword: "#include",
     }),
   ],
 });

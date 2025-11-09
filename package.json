@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.16",
     "@react-three/drei": "^10.3.0",
     "@react-three/fiber": "^9.1.2",
     "@react-three/rapier": "^2.1.0",
@@ -18,11 +19,13 @@
     "leva": "^0.10.0",
     "lygia": "^1.3.3",
     "meshline": "^3.3.1",
+    "music-metadata": "^11.9.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "resolve-lygia": "^1.0.4",
     "tailwindcss": "^4.1.10",
     "three": "^0.177.0",
+    "uint8array-extras": "^1.5.0",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

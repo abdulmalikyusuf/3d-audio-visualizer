@@ -5,8 +5,8 @@ import { useShallow } from "zustand/shallow";
 
 import { useThreeObject } from "../lib/store/object";
 import { useControls } from "../lib/store/controls";
-import sphereVertexShader from "../shaders/anomaly.vert.glsl";
-import sphereFragmentShader from "../shaders/anomaly.frag.glsl";
+import sphereVertexShader from "../shaders/anomaly.vert";
+import sphereFragmentShader from "../shaders/anomaly.frag";
 import useAudioStore from "../lib/audio";
 import { useMessage } from "../lib/store/message";
 import type { ThreeEvent } from "@react-three/fiber";
@@ -62,7 +62,8 @@ export function AnomalyObject() {
     sensitivity: audioSensitivity,
   } = useControls();
   const {
-    controlsRef,
+    disableControls,
+    enableControls,
     isDraggingAnomaly,
     anomalyVelocity,
     anomalyTargetPosition,
@@ -117,7 +118,7 @@ export function AnomalyObject() {
 
     let audioLevel = 0;
     if (isAudioPlaying && audioAnalyser && frequencyData) {
-      audioAnalyser.getByteFrequencyData(frequencyData);
+      audioAnalyser.getByteFrequencyData(frequencyData as Uint8Array<ArrayBuffer>);
       let sum = 0;
       for (let i = 0; i < frequencyData.length; i++) {
         sum += frequencyData[i];
@@ -171,8 +172,8 @@ export function AnomalyObject() {
         if (Math.abs(velocity.current.x) > 0.1) {
           setTerminalMessage(
             "ANOMALY BOUNDARY COLLISION DETECTED. ENERGY TRANSFER: " +
-              (Math.abs(velocity.current.x) * 100).toFixed(0) +
-              " UNITS"
+            (Math.abs(velocity.current.x) * 100).toFixed(0) +
+            " UNITS"
           );
         }
       }
@@ -182,8 +183,8 @@ export function AnomalyObject() {
         if (Math.abs(velocity.current.y) > 0.1) {
           setTerminalMessage(
             "ANOMALY BOUNDARY COLLISION DETECTED. ENERGY TRANSFER: " +
-              (Math.abs(velocity.current.y) * 100).toFixed(0) +
-              " UNITS"
+            (Math.abs(velocity.current.y) * 100).toFixed(0) +
+            " UNITS"
           );
         }
       }
@@ -205,7 +206,7 @@ export function AnomalyObject() {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    if (controlsRef) controlsRef.enabled = false;
+    disableControls()
     setIsDragging(true);
     setThreeObjectState({ isDraggingAnomaly: true });
     dragStartPosition.current.set(event.clientX, event.clientY);
@@ -245,48 +246,48 @@ export function AnomalyObject() {
       dragStartPosition.current.y = event.clientY;
     }
   };
-  const handlePointerMove1 = (event: ThreeEvent<PointerEvent>) => {
-    if (isDragging) {
-      event.stopPropagation();
+  // const handlePointerMove1 = (event: ThreeEvent<PointerEvent>) => {
+  //   if (isDragging) {
+  //     event.stopPropagation();
 
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  //     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  //     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      // Fix the drag direction to match mouse movement
-      const deltaX = (mouse.x - dragStartPosition.current.x) * 5;
-      const deltaY = (mouse.y - dragStartPosition.current.y) * 5;
-      console.log(deltaX);
-      target.current.x += deltaX;
-      target.current.y += deltaY;
-      setThreeObjectState({ anomalyTargetPosition: target.current });
+  //     // Fix the drag direction to match mouse movement
+  //     const deltaX = (mouse.x - dragStartPosition.current.x) * 5;
+  //     const deltaY = (mouse.y - dragStartPosition.current.y) * 5;
+  //     console.log(deltaX);
+  //     target.current.x += deltaX;
+  //     target.current.y += deltaY;
+  //     setThreeObjectState({ anomalyTargetPosition: target.current });
 
-      // Clamp the position to the maxDragDistance
-      const distance = Math.sqrt(
-        target.current.x * target.current.x +
-          target.current.y * target.current.y
-      );
-      if (distance > maxDragDistance) {
-        const scale = maxDragDistance / distance;
-        console.log(distance, maxDragDistance, scale);
+  //     // Clamp the position to the maxDragDistance
+  //     const distance = Math.sqrt(
+  //       target.current.x * target.current.x +
+  //       target.current.y * target.current.y
+  //     );
+  //     if (distance > maxDragDistance) {
+  //       const scale = maxDragDistance / distance;
+  //       console.log(distance, maxDragDistance, scale);
 
-        target.current.x *= scale;
-        target.current.y *= scale;
-        setThreeObjectState({ anomalyTargetPosition: target.current });
-      }
+  //       target.current.x *= scale;
+  //       target.current.y *= scale;
+  //       setThreeObjectState({ anomalyTargetPosition: target.current });
+  //     }
 
-      // Update velocity
-      setThreeObjectState({ anomalyVelocity: velocity.current });
-      velocity.current.x = deltaX * 2;
-      velocity.current.y = deltaY * 2;
-      // Update the start position for the next frame
-      dragStartPosition.current.x = mouse.x;
-      dragStartPosition.current.y = mouse.y;
-    }
-  };
+  //     // Update velocity
+  //     setThreeObjectState({ anomalyVelocity: velocity.current });
+  //     velocity.current.x = deltaX * 2;
+  //     velocity.current.y = deltaY * 2;
+  //     // Update the start position for the next frame
+  //     dragStartPosition.current.x = mouse.x;
+  //     dragStartPosition.current.y = mouse.y;
+  //   }
+  // };
 
   const handlePointerUp = () => {
     if (isDragging) {
-      if (controlsRef) controlsRef.enabled = true;
+      enableControls()
       setIsDragging(false);
       setThreeObjectState({ isDraggingAnomaly: false });
 
@@ -301,7 +302,7 @@ export function AnomalyObject() {
 
   const handlePointerLeave = () => {
     if (isDragging) {
-      if (controlsRef) controlsRef.enabled = true;
+      enableControls()
       setIsDragging(false);
       setThreeObjectState({ isDraggingAnomaly: false });
     }
