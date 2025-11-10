@@ -1,14 +1,14 @@
 import { parseBlob } from "music-metadata";
 import { uint8ArrayToBase64 } from "uint8array-extras";
-import { formatTime } from "./utils";
+import { formatTime, slugify } from "./utils";
 import { PlaylistItem } from "../types";
 
 export async function parseFiles(audioFiles: File[]): Promise<PlaylistItem[]> {
   const audioFilesResultArray = [];
 
   for (const audioFile of audioFiles) {
-    const fileUrl = URL.createObjectURL(audioFile);
-    const uuid = crypto.randomUUID();
+    // const fileUrl = URL.createObjectURL(audioFile);
+    // const uuid = crypto.randomUUID();
     let mm = {};
     try {
       const metadata = await parseBlob(audioFile, { duration: true });
@@ -36,7 +36,6 @@ export async function parseFiles(audioFiles: File[]): Promise<PlaylistItem[]> {
       title = title.replaceAll("_", " ").trimStart();
 
       mm = {
-        title,
         artist: common.artist || "Unknown",
         album: common.album || "Unknown",
         duration,
@@ -47,7 +46,6 @@ export async function parseFiles(audioFiles: File[]): Promise<PlaylistItem[]> {
     } catch (error) {
       console.error("Error reading metadata for", audioFile.name, error);
       mm = {
-        title: audioFile.name.replaceAll("_", " ").trimStart(),
         artist: "Unknown",
         album: "Unknown",
         duration: "Unknown",
@@ -55,9 +53,16 @@ export async function parseFiles(audioFiles: File[]): Promise<PlaylistItem[]> {
         cover: null,
       };
     }
+
+    const title = audioFile.name.replaceAll("_", " ").trimStart();
+
     audioFilesResultArray.push({
-      id: uuid,
-      data: { ...mm, file: fileUrl },
+      id: slugify(title.split(".").slice(0, -1).join(".")),
+      data: {
+        ...mm,
+        title,
+        file: audioFile,
+      },
     } as PlaylistItem);
   }
 

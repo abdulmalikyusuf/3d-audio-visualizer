@@ -2,6 +2,7 @@ import MorphSVGPlugin from "gsap/MorphSVGPlugin";
 import { ChangeEvent, useEffect, useRef, useTransition } from "react";
 import gsap from "gsap";
 import { useShallow } from "zustand/shallow";
+import { useLiveQuery } from "dexie-react-hooks"
 
 import { formatTime } from "../lib/utils";
 import { parseFiles } from "../lib/parse-files";
@@ -11,6 +12,7 @@ import { useControls } from "../lib/store/controls";
 import { useMessage } from "../lib/store/message";
 import { SpectrumAnalyzer } from "./visualizers/spectrum-analyzer";
 import "../styles/media-player.css";
+import { db } from "../lib/db";
 
 gsap.registerPlugin(MorphSVGPlugin);
 
@@ -150,14 +152,17 @@ function AudioPlayerSongPlayProgress() {
     }))
   );
 
-  const time = currentTime;
 
   useEffect(() => {
+    if (!isAudioPlaying) return;
     if (ref.current) {
-      const progress = (time / duration) * 100 + 0.6 + "%";
+      const pct = (currentTime / duration) * 100;
+      const progress = (pct < 30 ? pct + 0.6 : pct - 1) + "%";
       ref.current?.style.setProperty("--progress", progress);
     }
-  }, [time, duration]);
+  }, [currentTime, duration, isAudioPlaying]);
+
+  if (!isAudioPlaying) return null
 
   return (
     <div
@@ -171,7 +176,7 @@ function AudioPlayerSongPlayProgress() {
         id="song-percentage-played"
         className="amplitude-song-slider"
         step="1"
-        value={time}
+        value={currentTime}
         onChange={(e) => skipToTime(e.target.valueAsNumber)}
         min={0}
         max={duration}
@@ -189,7 +194,7 @@ function AudioPlayerSongPlayProgress() {
         }
       />
       <div className="">
-        <span className="amplitude-current-time">{formatTime(time)}</span>
+        <span className="amplitude-current-time">{formatTime(currentTime)}</span>
         <span className="amplitude-duration-time">
           {duration !== 0 ? formatTime(duration) : "--:--"}
         </span>
@@ -210,6 +215,9 @@ function AudioPlayerControlPanel() {
     toggleRepeat,
     playbackRate,
     setPlaybackRate,
+    addItem,
+    removeItem,
+    favourites,
   } = useAudioStore(
     useShallow((s) => ({
       nextTrack: s.nextTrack,
@@ -222,6 +230,9 @@ function AudioPlayerControlPanel() {
       toggleRepeat: s.toggleRepeat,
       playbackRate: s.playbackRate,
       setPlaybackRate: s.setPlaybackRate,
+      addItem: s.addItemToIndexedDB,
+      removeItem: s.removeItemFromIndexedDB,
+      favourites: s.favourites,
     }))
   );
   const { sensitivity, setSensitivity } = useControls(
@@ -231,19 +242,31 @@ function AudioPlayerControlPanel() {
     }))
   );
 
+  const favIds = favourites?.map(item => item.id);
+  const isFavourite = currentTrackIndex !== null && favIds?.includes(playlist[currentTrackIndex].id)
+
   return (
     <div className="h-control-panel">
       <button
         type="button"
         className="cursor-pointer"
         id="song-saved"
-        disabled={!playlist[0]}
+        disabled={currentTrackIndex === null}
+        onClick={() => {
+          if (currentTrackIndex !== null) {
+            if (isFavourite) {
+              removeItem(playlist[currentTrackIndex].id, playlist[currentTrackIndex].data.title)
+            } else {
+              addItem(playlist[currentTrackIndex])
+            }
+          }
+        }}
       >
         <svg
           width="20"
           height="18"
           viewBox="0 0 26 24"
-          fill="none"
+          fill={isFavourite ? "#ff4e42" : "none"}
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
@@ -353,7 +376,7 @@ function AudioPlayerControlPanel() {
       </button>
 
       <Popover>
-        <PopoverTrigger className="cursor-pointer" disabled={!playlist[0]}>
+        <PopoverTrigger className="cursor-pointer" disabled={currentTrackIndex === null}>
           <svg
             width="26"
             height="26"
@@ -451,8 +474,8 @@ function AudioPlayerControlPanel() {
 
 function AudioPlayerPlaylistHeader() {
   const [pending, startTransition] = useTransition();
-  const { setPlaylist, initAudio } = useAudioStore(
-    useShallow((s) => ({ setPlaylist: s.setPlaylist, initAudio: s.initAudio }))
+  const { setPlaylist, initAudio, toggleFavourites } = useAudioStore(
+    useShallow((s) => ({ setPlaylist: s.setPlaylist, initAudio: s.initAudio, toggleFavourites: s.toggleFavourites }))
   );
   const { showNotification, setTerminalMessage } = useMessage(
     useShallow((s) => ({
@@ -569,7 +592,7 @@ function AudioPlayerPlaylistHeader() {
             disabled={pending}
           />
         </label>
-        <button type="button" className="btn" id="folder__btn" disabled>
+        <button type="button" className="btn" id="folder__btn" onClick={toggleFavourites}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -591,74 +614,101 @@ function AudioPlayerPlaylistHeader() {
 }
 
 function AudioPlayerItems() {
-  const { playlist, currentTrack, loadAudioFromURL, isAudioPlaying } =
+  const { playlist, currentTrack, loadAudioFromURL, isAudioPlaying, addItem, favourites, removeItem } =
     useAudioStore(
       useShallow((s) => ({
         playlist: s.playlist,
         currentTrack: s.currentTrack,
         loadAudioFromURL: s.loadAudioFromURL,
         isAudioPlaying: s.isAudioPlaying,
+        addItem: s.addItemToIndexedDB,
+        favourites: s.favourites,
+        removeItem: s.removeItemFromIndexedDB,
       }))
     );
+
 
   if (!playlist[0]) {
     return (
       <div className="playlist-empty-message">
         <p>
-          No files loaded. Use the **Load Audio File** button above to select
-          music from your device and build your local playlist.
+          No files loaded. Use the Load Audio File/Folder button above to select
+          music from your device or load your saved favourite and build your local playlist.
         </p>
       </div>
     );
   }
 
+  const favIds = favourites?.map(item => item.id);
+
   return (
     <div id="playlist-items__container">
-      {playlist.map((item) => (
-        <div
-          key={item.id}
-          data-active={
-            currentTrack !== null
-              ? currentTrack.id === item.id && isAudioPlaying
-              : false
-          }
-          onClick={() => loadAudioFromURL(item)}
-          className="playlist-item"
-        >
-          <img
-            src={
-              item.data.cover ??
-              "https://github.com/user-attachments/assets/d80e6b68-b67a-4e27-86ee-e00581883d5c"
+      {playlist.map((item) => {
+        const isFavourite = favIds?.includes(item.id)
+        return (
+          <div
+            key={item.id}
+            data-active={
+              currentTrack !== null
+                ? currentTrack.id === item.id && isAudioPlaying
+                : false
             }
-            alt=""
-          />
-          <div className="song">
-            <p id="song-artist">{item.data.artist}</p>
-            <p id="song-title">{item.data.title}</p>
-          </div>
-          <p>{item.data.duration}</p>
-          <svg
-            width="20"
-            height="18"
-            viewBox="0 0 26 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
+            onClick={() => loadAudioFromURL(item)}
+            className="playlist-item"
           >
-            <path
-              d="M25 7C25 3.68629 22.2018 1 18.75 1C16.1692 1 13.9537 2.5017 13 4.64456C12.0463 2.5017 9.83082 1 7.25 1C3.79822 1 1 3.68629 1 7C1 14.6072 8.49219 20.1822 11.6365 22.187C12.4766 22.7226 13.5234 22.7226 14.3635 22.187C17.5078 20.1822 25 14.6072 25 7Z"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <p className="now-playing">Now playing</p>
-        </div>
-      ))}
+            {item.data.cover && <img
+              src={item.data.cover}
+              alt={item.data.title}
+            />}
+            <div className="song">
+              <p id="song-artist">{item.data.artist}</p>
+              <p id="song-title">{item.data.title}</p>
+            </div>
+            <p>{item.data.duration}</p>
+
+            <button type="button" onClick={(e) => {
+              e.stopPropagation()
+              if (isFavourite) {
+                removeItem(item.id, item.data.title)
+              } else {
+                addItem(item)
+              }
+            }} style={{ appearance: "none", background: "none", border: "none", color: "#ffb3ab" }}>
+              <svg
+                width="20"
+                height="18"
+                viewBox="0 0 26 24"
+                fill={isFavourite ? "#ff4e42" : "none"}
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M25 7C25 3.68629 22.2018 1 18.75 1C16.1692 1 13.9537 2.5017 13 4.64456C12.0463 2.5017 9.83082 1 7.25 1C3.79822 1 1 3.68629 1 7C1 14.6072 8.49219 20.1822 11.6365 22.187C12.4766 22.7226 13.5234 22.7226 14.3635 22.187C17.5078 20.1822 25 14.6072 25 7Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <p className="now-playing">Now playing</p>
+          </div>
+        )
+      })}
     </div>
   );
 }
 
 export function MediaPlayer() {
+  const favItems = useLiveQuery(() => db.getAllAudioItems())
+
+  const { setFavourites } =
+    useAudioStore(
+      useShallow((s) => ({
+        setFavourites: s.setFavourites
+      }))
+    );
+
+  useEffect(() => { setFavourites(favItems) }, [favItems, setFavourites])
+
   return (
     <>
       <div className="playlist">

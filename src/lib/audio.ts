@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { useMessage } from "./store/message";
 import { PlaylistItem } from "../types";
+import { db, DBPlaylistItem } from "./db";
+import Dexie from "dexie";
 
 interface AudioState {
   isAudioInitialized: boolean;
@@ -12,6 +14,7 @@ interface AudioState {
   audioContextStarted: boolean;
   currentAudioSrc: string | null;
   zoomIn: boolean;
+  showFavourites: boolean;
   // element-based player
   audioElement: HTMLAudioElement | null;
   mediaElementSource: MediaElementAudioSourceNode | null;
@@ -25,6 +28,8 @@ interface AudioState {
 
   // playlist
   playlist: PlaylistItem[];
+  tempPlaylist: PlaylistItem[];
+  favourites: DBPlaylistItem[];
   currentTrackIndex: number | null;
   currentTrack: PlaylistItem | null;
 
@@ -42,6 +47,7 @@ interface AudioActions {
   initAudio: () => boolean;
   ensureAudioContextStarted: () => Promise<boolean>;
   setPlaylist: (playlist: PlaylistItem[], startIndex?: number) => void;
+  setFavourites: (items: DBPlaylistItem[] | undefined) => void;
   loadAudioFromURL: (track: PlaylistItem, autoPlay?: boolean) => Promise<void>;
   playPauseAudio: () => void;
   pauseAudio: () => void;
@@ -57,6 +63,9 @@ interface AudioActions {
   clearShuffleOrder: () => void;
   syncShufflePointerToIndex: (index: number) => void;
   setPlaybackRate: (rate: number) => void;
+  toggleFavourites: () => void;
+  addItemToIndexedDB: (item: PlaylistItem) => void;
+  removeItemFromIndexedDB: (itemId: string, title: string) => void;
 }
 
 type AudioStore = AudioState & AudioActions;
@@ -74,6 +83,7 @@ const useAudioStore = create<AudioStore>((set, get) => ({
   mediaElementSource: null,
   currentAudioSrc: null,
   zoomIn: false,
+  showFavourites: false,
   audioBuffer: null,
   source: null,
   startTime: 0,
@@ -89,8 +99,29 @@ const useAudioStore = create<AudioStore>((set, get) => ({
   shuffleOrder: [],
   shufflePointer: 0,
   playbackRate: 1,
+  tempPlaylist: [],
+  favourites: [],
 
   // ==== ACTIONS ====
+  setFavourites: (items) => set({ favourites: items ?? [] }),
+  toggleFavourites: async () => {
+    const { favourites: favItems, showFavourites } = get();
+    if (showFavourites) {
+      set((s) => ({
+        playlist: s.tempPlaylist[0] ? s.tempPlaylist : [],
+        tempPlaylist: [],
+        showFavourites: false,
+      }));
+    } else {
+      const r = favItems?.map((i) => ({ id: i.id, data: { ...i } }));
+      set((s) => ({
+        playlist: r ? r : [],
+        tempPlaylist: s.playlist,
+        showFavourites: true,
+      }));
+    }
+  },
+
   setPlaybackRate: (rate) => {
     const clampedRate = Math.max(0.25, Math.min(rate, 2)); // prevent extremes
     const { audioElement } = get();
@@ -274,7 +305,14 @@ const useAudioStore = create<AudioStore>((set, get) => ({
         }
 
         // No repeat and no shuffle -> just stop after current track
-        set({ isAudioPlaying: false, status: "stopped" });
+        set({
+          isAudioPlaying: false,
+          currentTrackIndex: null,
+          currentTrack: null,
+          currentTime: 0,
+          duration: 0,
+          status: "stopped",
+        });
         zoomCameraForAudio(false);
         useMessage.getState().setTerminalMessage("PLAYBACK COMPLETE.");
       });
@@ -345,6 +383,10 @@ const useAudioStore = create<AudioStore>((set, get) => ({
     } catch {
       /* empty */
     }
+    const fileUrl =
+      track.data.file instanceof File
+        ? URL.createObjectURL(track.data.file)
+        : track.data.file;
 
     set({ status: "loading" });
 
@@ -354,11 +396,11 @@ const useAudioStore = create<AudioStore>((set, get) => ({
     set({
       currentTrackIndex: indexToSet,
       currentTrack: playlist[indexToSet] ?? track,
-      currentAudioSrc: track.data.file,
+      currentAudioSrc: fileUrl,
     });
 
     // set source on audio element and try to play (autoPlay param)
-    audioElement.src = track.data.file;
+    audioElement.src = fileUrl;
     audioElement.load();
 
     // set duration once metadata available
@@ -403,8 +445,8 @@ const useAudioStore = create<AudioStore>((set, get) => ({
 
     // start time tracker (reads from audioElement.currentTime)
     const trackTime = () => {
-      const { audioElement: el, currentTime } = get();
-      if (!el) return;
+      const { audioElement: el, currentTime, isAudioPlaying } = get();
+      if (!el || !isAudioPlaying) return;
       const newTime = el.currentTime;
       if (Math.abs(newTime - currentTime) > 0.05) set({ currentTime: newTime });
       // continue tracking while the element exists and is playing (or even when paused if you want)
@@ -510,6 +552,53 @@ const useAudioStore = create<AudioStore>((set, get) => ({
   },
 
   zoomCameraForAudio: (zoomIn) => set({ zoomIn }),
+
+  addItemToIndexedDB: async (item) => {
+    const { id, data } = item;
+    const { artist, title, album, cover, duration, file, time } = data;
+    await db
+      .addAudioItem({
+        id,
+        artist,
+        title,
+        album,
+        cover,
+        duration,
+        file,
+        time,
+      })
+      .then(() =>
+        useMessage.getState().showNotification(`added ${title} to favourite`)
+      )
+      .catch((err) => {
+        if (err instanceof Dexie.ModifyError) {
+          err.failures.forEach((failure) => {
+            console.error(failure.stack || failure.message);
+          });
+        } else if (err instanceof Dexie.ConstraintError) {
+          console.log(`${err.name.toLocaleUpperCase()}: ${err.message}`);
+          useMessage
+            .getState()
+            .showNotification(`${title} already in favourites`);
+        } else {
+          console.log(err);
+          throw err;
+        }
+      });
+  },
+  removeItemFromIndexedDB: async (id, title) => {
+    await db
+      .deleteAudioItem(id)
+      .then(() =>
+        useMessage
+          .getState()
+          .showNotification(`removed ${title} from favourite`)
+      )
+      .catch((err) => {
+        console.log(err);
+        throw err;
+      });
+  },
 }));
 
 export default useAudioStore;
