@@ -1,8 +1,8 @@
 import MorphSVGPlugin from "gsap/MorphSVGPlugin";
-import { ChangeEvent, useEffect, useRef, useTransition } from "react";
+import { ChangeEvent, forwardRef, HTMLAttributes, useEffect, useRef, useTransition } from "react";
 import gsap from "gsap";
 import { useShallow } from "zustand/shallow";
-import { useLiveQuery } from "dexie-react-hooks"
+import { useLiveQuery } from "dexie-react-hooks";
 
 import { formatTime } from "../lib/utils";
 import { parseFiles } from "../lib/parse-files";
@@ -142,16 +142,16 @@ function AudioPlayerSongInfo() {
 
 function AudioPlayerSongPlayProgress() {
   const ref = useRef<HTMLInputElement | null>(null);
-  const { currentTime, skipToTime, isAudioPlaying, duration, playPauseAudio } = useAudioStore(
-    useShallow((s) => ({
-      currentTime: s.currentTime,
-      skipToTime: s.skipToTime,
-      isAudioPlaying: s.isAudioPlaying,
-      duration: s.duration,
-      playPauseAudio: s.playPauseAudio,
-    }))
-  );
-
+  const { currentTime, skipToTime, isAudioPlaying, duration, playPauseAudio } =
+    useAudioStore(
+      useShallow((s) => ({
+        currentTime: s.currentTime,
+        skipToTime: s.skipToTime,
+        isAudioPlaying: s.isAudioPlaying,
+        duration: s.duration,
+        playPauseAudio: s.playPauseAudio,
+      }))
+    );
 
   useEffect(() => {
     if (!isAudioPlaying) return;
@@ -162,7 +162,7 @@ function AudioPlayerSongPlayProgress() {
     }
   }, [currentTime, duration, isAudioPlaying]);
 
-  if (!isAudioPlaying) return null
+  if (!isAudioPlaying) return null;
 
   return (
     <div
@@ -183,7 +183,7 @@ function AudioPlayerSongPlayProgress() {
         onKeyDown={(e) => {
           if (e.key === " ") {
             e.preventDefault();
-            playPauseAudio()
+            playPauseAudio();
           }
         }}
         disabled={
@@ -194,7 +194,9 @@ function AudioPlayerSongPlayProgress() {
         }
       />
       <div className="">
-        <span className="amplitude-current-time">{formatTime(currentTime)}</span>
+        <span className="amplitude-current-time">
+          {formatTime(currentTime)}
+        </span>
         <span className="amplitude-duration-time">
           {duration !== 0 ? formatTime(duration) : "--:--"}
         </span>
@@ -215,9 +217,15 @@ function AudioPlayerControlPanel() {
     toggleRepeat,
     playbackRate,
     setPlaybackRate,
+    setPannerValue,
     addItem,
     removeItem,
     favourites,
+    panValue,
+    setVolume,
+    volume,
+    filterFreq,
+    changeFrequency
   } = useAudioStore(
     useShallow((s) => ({
       nextTrack: s.nextTrack,
@@ -229,9 +237,15 @@ function AudioPlayerControlPanel() {
       isRepeat: s.isRepeat,
       toggleRepeat: s.toggleRepeat,
       playbackRate: s.playbackRate,
+      panValue: s.panValue,
       setPlaybackRate: s.setPlaybackRate,
+      setPannerValue: s.setPannerValue,
+      setVolume: s.setVolume,
+      volume: s.volume,
       addItem: s.addItemToIndexedDB,
       removeItem: s.removeItemFromIndexedDB,
+      changeFrequency: s.changeFrequency,
+      filterFreq: s.filterFreq,
       favourites: s.favourites,
     }))
   );
@@ -242,8 +256,10 @@ function AudioPlayerControlPanel() {
     }))
   );
 
-  const favIds = favourites?.map(item => item.id);
-  const isFavourite = currentTrackIndex !== null && favIds?.includes(playlist[currentTrackIndex].id)
+  const favIds = favourites?.map((item) => item.id);
+  const isFavourite =
+    currentTrackIndex !== null &&
+    favIds?.includes(playlist[currentTrackIndex].id);
 
   return (
     <div className="h-control-panel">
@@ -255,9 +271,12 @@ function AudioPlayerControlPanel() {
         onClick={() => {
           if (currentTrackIndex !== null) {
             if (isFavourite) {
-              removeItem(playlist[currentTrackIndex].id, playlist[currentTrackIndex].data.title)
+              removeItem(
+                playlist[currentTrackIndex].id,
+                playlist[currentTrackIndex].data.title
+              );
             } else {
-              addItem(playlist[currentTrackIndex])
+              addItem(playlist[currentTrackIndex]);
             }
           }
         }}
@@ -376,7 +395,10 @@ function AudioPlayerControlPanel() {
       </button>
 
       <Popover>
-        <PopoverTrigger className="cursor-pointer" disabled={currentTrackIndex === null}>
+        <PopoverTrigger
+          className="cursor-pointer"
+          disabled={currentTrackIndex === null}
+        >
           <svg
             width="26"
             height="26"
@@ -409,6 +431,64 @@ function AudioPlayerControlPanel() {
           aria-hidden="true"
           style={{ zIndex: 50 }}
         >
+          <div className="group">
+            <div className="popover-title">
+              <p className="vertical-slider__label">VOLUME</p>
+            </div>
+            <div
+              className="popover-card"
+              role="group"
+              aria-label="Volume control"
+            >
+              <div className="vertical-wrap">
+                <input
+                  type="range"
+                  className="vertical-range"
+                  min="-1"
+                  max="3"
+                  step="0.25"
+                  id="volume-slider"
+                  value={volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  aria-label="Volume"
+                />
+              </div>
+              <span className="vertical-slider__value" id="volume-value">
+                {volume}
+              </span>
+            </div>
+          </div>
+          <div className="group">
+            <div className="popover-title">
+              <p className="vertical-slider__label">STEREO PANNER</p>
+            </div>
+            <div
+              className="popover-card"
+              role="group"
+              aria-label="Stereo Panning control"
+            >
+              <div className="vertical-wrap">
+                <input
+                  type="range"
+                  className="vertical-range"
+                  min="-1"
+                  max="1"
+                  step="0.1"
+                  id="stereo_panning-slider"
+                  value={panValue}
+                  onChange={(e) => setPannerValue(parseFloat(e.target.value))}
+                  aria-label="Stereo Panning"
+                />
+              </div>
+              <span
+                className="vertical-slider__value"
+                id="stereo_panning-value"
+              >
+                {Math.abs(panValue)}(
+                {panValue === 0 ? "B" : panValue < 0 ? "L" : "R"})
+              </span>
+            </div>
+          </div>
           <div className="group">
             <div className="popover-title">
               <p className="vertical-slider__label">PLAYBACK RATE</p>
@@ -466,6 +546,33 @@ function AudioPlayerControlPanel() {
               </span>
             </div>
           </div>
+          <div className="group" style={{ display: "none" }}>
+            <div className="popover-title">
+              <p className="vertical-slider__label">FREQUENCY FILTER</p>
+            </div>
+            <div
+              className="popover-card"
+              role="group"
+              aria-label="Filter Frequency control"
+            >
+              <div className="vertical-wrap">
+                <input
+                  type="range"
+                  className="vertical-range"
+                  min="40"
+                  max="880"
+                  step="10"
+                  id="filter__frequency-slider"
+                  value={filterFreq}
+                  onChange={(e) => changeFrequency(parseFloat(e.target.value))}
+                  aria-label="Filter Frequency"
+                />
+              </div>
+              <span className="vertical-slider__value" id="filter__frequency-value">
+                {filterFreq.toFixed(1)}
+              </span>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>
@@ -474,8 +581,13 @@ function AudioPlayerControlPanel() {
 
 function AudioPlayerPlaylistHeader() {
   const [pending, startTransition] = useTransition();
-  const { setPlaylist, initAudio, toggleFavourites } = useAudioStore(
-    useShallow((s) => ({ setPlaylist: s.setPlaylist, initAudio: s.initAudio, toggleFavourites: s.toggleFavourites }))
+  const { setPlaylist, initAudio, toggleFavourites, showFavourites } = useAudioStore(
+    useShallow((s) => ({
+      setPlaylist: s.setPlaylist,
+      initAudio: s.initAudio,
+      toggleFavourites: s.toggleFavourites,
+      showFavourites: s.showFavourites,
+    }))
   );
   const { showNotification, setTerminalMessage } = useMessage(
     useShallow((s) => ({
@@ -536,7 +648,7 @@ function AudioPlayerPlaylistHeader() {
           <circle cx="14" cy="16" r="2" />
           <circle cx="6" cy="18" r="2" />
         </svg>
-        <span className="">Media Library</span>
+        <span className="">{showFavourites ? "Favourites" : "Media Library"}</span>
       </div>
       <div className="import-media">
         <label className="btn" id="files__btn" htmlFor="files">
@@ -592,7 +704,12 @@ function AudioPlayerPlaylistHeader() {
             disabled={pending}
           />
         </label>
-        <button type="button" className="btn" id="folder__btn" onClick={toggleFavourites}>
+        <button
+          type="button"
+          className="btn"
+          id="folder__btn"
+          onClick={toggleFavourites}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -601,11 +718,10 @@ function AudioPlayerPlaylistHeader() {
             strokeWidth="1.5"
             stroke-linecap="round"
             strokeLinejoin="round"
-            className="lucide lucide-folder-up-icon lucide-folder-up"
+            className="lucide lucide-folder-heart-icon lucide-folder-heart"
           >
-            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-            <path d="M12 10v6" />
-            <path d="m9 13 3-3 3 3" />
+            <path d="M10.638 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v3.417" />
+            <path d="M14.62 18.8A2.25 2.25 0 1 1 18 15.836a2.25 2.25 0 1 1 3.38 2.966l-2.626 2.856a.998.998 0 0 1-1.507 0z" />
           </svg>
         </button>
       </div>
@@ -614,37 +730,44 @@ function AudioPlayerPlaylistHeader() {
 }
 
 function AudioPlayerItems() {
-  const { playlist, currentTrack, loadAudioFromURL, isAudioPlaying, addItem, favourites, removeItem } =
-    useAudioStore(
-      useShallow((s) => ({
-        playlist: s.playlist,
-        currentTrack: s.currentTrack,
-        loadAudioFromURL: s.loadAudioFromURL,
-        isAudioPlaying: s.isAudioPlaying,
-        addItem: s.addItemToIndexedDB,
-        favourites: s.favourites,
-        removeItem: s.removeItemFromIndexedDB,
-      }))
-    );
-
+  const {
+    playlist,
+    currentTrack,
+    loadAudioFromURL,
+    isAudioPlaying,
+    addItem,
+    favourites,
+    removeItem,
+  } = useAudioStore(
+    useShallow((s) => ({
+      playlist: s.playlist,
+      currentTrack: s.currentTrack,
+      loadAudioFromURL: s.loadAudioFromURL,
+      isAudioPlaying: s.isAudioPlaying,
+      addItem: s.addItemToIndexedDB,
+      favourites: s.favourites,
+      removeItem: s.removeItemFromIndexedDB,
+    }))
+  );
 
   if (!playlist[0]) {
     return (
       <div className="playlist-empty-message">
         <p>
           No files loaded. Use the Load Audio File/Folder button above to select
-          music from your device or load your saved favourite and build your local playlist.
+          music from your device or load your saved favourite and build your
+          local playlist.
         </p>
       </div>
     );
   }
 
-  const favIds = favourites?.map(item => item.id);
+  const favIds = favourites?.map((item) => item.id);
 
   return (
     <div id="playlist-items__container">
       {playlist.map((item) => {
-        const isFavourite = favIds?.includes(item.id)
+        const isFavourite = favIds?.includes(item.id);
         return (
           <div
             key={item.id}
@@ -656,24 +779,32 @@ function AudioPlayerItems() {
             onClick={() => loadAudioFromURL(item)}
             className="playlist-item"
           >
-            {item.data.cover && <img
-              src={item.data.cover}
-              alt={item.data.title}
-            />}
+            {item.data.cover && (
+              <img src={item.data.cover} alt={item.data.title} />
+            )}
             <div className="song">
               <p id="song-artist">{item.data.artist}</p>
               <p id="song-title">{item.data.title}</p>
             </div>
             <p>{item.data.duration}</p>
 
-            <button type="button" onClick={(e) => {
-              e.stopPropagation()
-              if (isFavourite) {
-                removeItem(item.id, item.data.title)
-              } else {
-                addItem(item)
-              }
-            }} style={{ appearance: "none", background: "none", border: "none", color: "#ffb3ab" }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isFavourite) {
+                  removeItem(item.id, item.data.title);
+                } else {
+                  addItem(item);
+                }
+              }}
+              style={{
+                appearance: "none",
+                background: "none",
+                border: "none",
+                color: "#ffb3ab",
+              }}
+            >
               <svg
                 width="20"
                 height="18"
@@ -691,26 +822,27 @@ function AudioPlayerItems() {
             </button>
             <p className="now-playing">Now playing</p>
           </div>
-        )
+        );
       })}
     </div>
   );
 }
 
-export function MediaPlayer() {
-  const favItems = useLiveQuery(() => db.getAllAudioItems())
+export const MediaPlayer = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>((props, ref) => {
+  const favItems = useLiveQuery(() => db.getAllAudioItems());
 
-  const { setFavourites } =
-    useAudioStore(
-      useShallow((s) => ({
-        setFavourites: s.setFavourites
-      }))
-    );
+  const { setFavourites } = useAudioStore(
+    useShallow((s) => ({
+      setFavourites: s.setFavourites,
+    }))
+  );
 
-  useEffect(() => { setFavourites(favItems) }, [favItems, setFavourites])
+  useEffect(() => {
+    setFavourites(favItems);
+  }, [favItems, setFavourites]);
 
   return (
-    <>
+    <div className="media-player-wrapper" ref={ref} {...props}>
       <div className="playlist">
         <AudioPlayerPlaylistHeader />
         <AudioPlayerItems />
@@ -724,6 +856,6 @@ export function MediaPlayer() {
           <div className="hidden top-14 w-full absolute ml-auto mr-auto left-0 right-0 text-center max-w-lg h-72 rounded-full bg-highlight blur-2xl" />
         </div>
       </div>
-    </>
+    </div>
   );
-}
+})

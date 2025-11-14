@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent } from "react";
+import { CSSProperties, useRef, type MouseEvent } from "react";
 import * as THREE from "three";
 import { useShallow } from "zustand/shallow";
 
@@ -10,6 +10,7 @@ import { useMessage } from "../lib/store/message";
 import { MediaPlayer } from "./media-player";
 import { Interface } from "./interface";
 import { AnomalyMetrics, AnomalyMetricsRef } from "./anomaly-metrics";
+import Collapse, { Trigger } from "../hooks/use-collapsible";
 
 
 function UI() {
@@ -80,106 +81,123 @@ function UI() {
       <DraggablePanel
         className="control-panel"
         selector="span#control-panel-handle"
-        style={{ top: "50%", left: "20px", transform: "translateY(-50%)" }}
+        style={{ top: "50%", left: "20px", transform: "translateY(-50%)", overflow: "hidden" }}
       >
-        <div className="panel-header">
-          <span className="data-panel-title">ANOMALY CONTROLS</span>
-          <span className="drag-handle" id="control-panel-handle">
-            ⋮⋮
-          </span>
-        </div>
-        <div className="control-group">
-          <div className="control-row">
-            <span className="control-label">ROTATION SPEED</span>
-            <span className="control-value" id="rotation-value">
-              {rotation.toFixed(1)}
-            </span>
-          </div>
-          <div className="slider-container">
-            <input
-              type="range"
-              min="0"
-              max="5"
-              value={rotation}
-              onChange={(e) => setRotation(parseFloat(e.target.value))}
-              step="0.1"
-              className="slider"
-              id="rotation-slider"
-            />
-          </div>
-        </div>
+        <Collapse duration={0.6}>
+          {({ isOpen, toggle, bodyRef, stateAttr, bodyStyles }) => (
+            <>
+              <div className="panel-header"{...stateAttr}>
+                <span className="data-panel-title">ANOMALY CONTROLS</span>
 
-        <div className="control-group">
-          <div className="control-row">
-            <span className="control-label">RESOLUTION</span>
-            <span className="control-value" id="resolution-value">
-              {resolution}
-            </span>
-          </div>
-          <div className="slider-container">
-            <input
-              type="range"
-              min="12"
-              max="64"
-              value={resolution}
-              onChange={(e) => setResolution(parseInt(e.target.value))}
-              step="4"
-              className="slider"
-              id="resolution-slider"
-            />
-          </div>
-        </div>
+                <div className="panel-header-buttons">
+                  <span className="drag-handle" id="control-panel-handle">
+                    ⋮⋮
+                  </span>
+                  <Trigger isOpen={isOpen} handleClick={toggle} />
+                </div>
+              </div>
+              <div className="" ref={bodyRef} {...stateAttr} style={bodyStyles}>
+                <div className="control-group">
+                  <div className="control-row">
+                    <span className="control-label">ROTATION SPEED</span>
+                    <span className="control-value" id="rotation-value">
+                      {rotation.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="slider-container">
+                    <input
+                      type="range"
+                      min="0"
+                      max="5"
+                      value={rotation}
+                      onChange={(e) => setRotation(parseFloat(e.target.value))}
+                      step="0.1"
+                      className="slider"
+                      id="rotation-slider"
+                      style={{ "--progress": (`${(rotation / 5) * 100}%`) } as CSSProperties}
+                    />
+                  </div>
+                </div>
 
-        <div className="control-group">
-          <div className="control-row">
-            <span className="control-label">DISTORTION</span>
-            <span className="control-value" id="distortion-value">
-              {distortion.toFixed(1)}
-            </span>
-          </div>
-          <div className="slider-container">
-            <input
-              type="range"
-              min="0"
-              max="3"
-              step="0.1"
-              className="slider"
-              id="distortion-slider"
-              value={distortion}
-              onChange={(e) => setDistortion(parseFloat(e.target.value))}
-            />
-          </div>
-        </div>
+                <div className="control-group">
+                  <div className="control-row">
+                    <span className="control-label">RESOLUTION</span>
+                    <span className="control-value" id="resolution-value">
+                      {resolution}
+                    </span>
+                  </div>
+                  <div className="slider-container">
+                    <input
+                      type="range"
+                      min="12"
+                      max="64"
+                      value={resolution}
+                      onChange={(e) => setResolution(parseInt(e.target.value))}
+                      step="4"
+                      className="slider"
+                      id="resolution-slider"
+                      style={{ "--progress": (`${((resolution - 12) / (64 - 12)) * 100}%`) } as CSSProperties}
+                    />
+                  </div>
+                </div>
 
-        <div className="control-group">
-          <div className="control-row">
-            <span className="control-label">AUDIO REACTIVITY</span>
-            <span className="control-value" id="reactivity-value">
-              {reactivity.toFixed(1)}
-            </span>
-          </div>
-          <div className="slider-container">
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              className="slider"
-              id="reactivity-slider"
-              value={reactivity}
-              onChange={(e) => setReactivity(parseFloat(e.target.value))}
-            />
-          </div>
-        </div>
+                <div className="control-group">
+                  <div className="control-row">
+                    <span className="control-label">DISTORTION</span>
+                    <span className="control-value" id="distortion-value">
+                      {distortion.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="slider-container">
+                    <input
+                      type="range"
+                      min="0"
+                      max="3"
+                      step="0.1"
+                      className="slider"
+                      id="distortion-slider"
+                      value={distortion}
+                      onChange={(e) => setDistortion(parseFloat(e.target.value))}
+                      style={{ "--progress": (`${(distortion / 3) * 100}%`) } as CSSProperties}
+                    />
+                  </div>
+                </div>
 
-        <div className="buttons">
-          <button className="btn" id="reset-btn" onClick={handleReset}>
-            RESET
-          </button>
-          <button className="btn" id="analyze-btn" onClick={analyze}>
-            ANALYZE
-          </button>
-        </div>
+                <div className="control-group">
+                  <div className="control-row">
+                    <span className="control-label">AUDIO REACTIVITY</span>
+                    <span className="control-value" id="reactivity-value">
+                      {reactivity.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="slider-container">
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      className="slider"
+                      id="reactivity-slider"
+                      value={reactivity}
+                      onChange={(e) => setReactivity(parseFloat(e.target.value))}
+                      style={{ "--progress": (`${(reactivity / 2) * 100}%`) } as CSSProperties}
+                    />
+                  </div>
+                </div>
+
+                <div className="buttons">
+                  <button className="btn" id="reset-btn" onClick={handleReset}>
+                    RESET
+                  </button>
+                  <button className="btn" id="analyze-btn" onClick={analyze}>
+                    ANALYZE
+                  </button>
+                </div>
+
+              </div>
+            </>
+          )}
+        </Collapse>
       </DraggablePanel>
 
       <Terminal />
@@ -188,13 +206,23 @@ function UI() {
         className="spectrum-analyzer"
         selector="span#spectrum-handle"
       >
-        <div className="spectrum-header">
-          <span>AUDIO SPECTRUM ANALYZER</span>
-          <span className="drag-handle" id="spectrum-handle">
-            ⋮⋮
-          </span>
-        </div>
-        <MediaPlayer />
+        <Collapse defaultOpen duration={0.6}>
+          {({ isOpen, toggle, bodyRef, stateAttr, bodyStyles }) => (
+            <>
+              <div className="spectrum-header">
+                <span>AUDIO SPECTRUM ANALYZER</span>
+
+                <div className="panel-header-buttons">
+                  <span className="drag-handle" id="spectrum-handle">
+                    ⋮⋮
+                  </span>
+                  <Trigger isOpen={isOpen} handleClick={toggle} />
+                </div>
+              </div>
+              <MediaPlayer ref={bodyRef} {...stateAttr} style={bodyStyles} />
+            </>
+          )}
+        </Collapse>
       </DraggablePanel>
     </>
   );

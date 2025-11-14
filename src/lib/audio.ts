@@ -19,6 +19,14 @@ interface AudioState {
   audioElement: HTMLAudioElement | null;
   mediaElementSource: MediaElementAudioSourceNode | null;
 
+  // Audio Modification AudioNodes
+  panNode: StereoPannerNode | null;
+  gainNode: GainNode | null;
+  panValue: number;
+  volume: number;
+  biquadFilterNode: BiquadFilterNode | null;
+  filterFreq: number;
+
   // playback tracking
   startTime: number; // context time when play started (only for alignment)
   pauseTime: number; // seconds into the track when paused
@@ -45,6 +53,9 @@ interface AudioState {
 
 interface AudioActions {
   initAudio: () => boolean;
+  setPannerValue: (val: number) => void;
+  setVolume: (val: number) => void;
+  changeFrequency: (hertz: number) => void;
   ensureAudioContextStarted: () => Promise<boolean>;
   setPlaylist: (playlist: PlaylistItem[], startIndex?: number) => void;
   setFavourites: (items: DBPlaylistItem[] | undefined) => void;
@@ -81,11 +92,16 @@ const useAudioStore = create<AudioStore>((set, get) => ({
   audioContextStarted: false,
   audioElement: null,
   mediaElementSource: null,
+  panNode: null,
+  panValue: 0,
+  gainNode: null,
+  volume: 1.0,
+  biquadFilterNode: null,
+  filterFreq: 480,
   currentAudioSrc: null,
   zoomIn: false,
   showFavourites: false,
   audioBuffer: null,
-  source: null,
   startTime: 0,
   pauseTime: 0,
   currentTime: 0,
@@ -192,8 +208,30 @@ const useAudioStore = create<AudioStore>((set, get) => ({
     set({ playlist });
   },
 
+  setPannerValue: (val) => {
+    const { panNode } = get();
+    if (panNode) {
+      panNode.pan.value = val;
+      set({ panValue: val });
+    }
+  },
+  setVolume: (val) => {
+    const { gainNode } = get();
+    if (gainNode) {
+      gainNode.gain.value = val;
+      set({ volume: val });
+    }
+  },
+  changeFrequency: (hertz) => {
+    const { biquadFilterNode } = get();
+    if (biquadFilterNode) {
+      biquadFilterNode.frequency.value = hertz;
+      set({ filterFreq: hertz });
+    }
+  },
+
   initAudio: () => {
-    const { isAudioInitialized } = get();
+    const { isAudioInitialized, panValue, volume, filterFreq } = get();
     if (isAudioInitialized) return true;
 
     try {
@@ -216,8 +254,32 @@ const useAudioStore = create<AudioStore>((set, get) => ({
       const mediaElementSource =
         audioContext.createMediaElementSource(audioElement);
       mediaElementSource.connect(audioAnalyser);
+
+      // AudioNodes Modifications
+      //StereoPanner
+      const pannerOptions = { pan: panValue } satisfies StereoPannerOptions;
+      const panNode = new StereoPannerNode(audioContext, pannerOptions);
+      //Low-pass filter
+      const biquadNodeOptions = {
+        type: "lowpass",
+        gain: volume,
+        frequency: filterFreq,
+      } satisfies BiquadFilterOptions;
+      const biquadFilterNode = new BiquadFilterNode(
+        audioContext,
+        biquadNodeOptions
+      );
+      console.log(audioAnalyser.maxDecibels.toFixed());
+      // Gain Node (Volume control -1 to 2.0)
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = volume;
+
       // audioAnalyser should connect to destination
-      audioAnalyser.connect(audioContext.destination);
+      audioAnalyser
+        // .connect(biquadFilterNode)
+        .connect(panNode)
+        .connect(gainNode)
+        .connect(audioContext.destination);
 
       set({
         audioContext,
@@ -226,6 +288,9 @@ const useAudioStore = create<AudioStore>((set, get) => ({
         frequencyData,
         audioElement,
         mediaElementSource,
+        panNode,
+        gainNode,
+        biquadFilterNode,
         isAudioInitialized: true,
       });
 
@@ -371,6 +436,7 @@ const useAudioStore = create<AudioStore>((set, get) => ({
       playlist,
       currentTrackIndex,
       audioElement,
+      gainNode,
     } = get();
     if (!isAudioInitialized || !audioContext || !audioElement) return;
 
@@ -405,7 +471,21 @@ const useAudioStore = create<AudioStore>((set, get) => ({
 
     // set duration once metadata available
     const onLoadedMetadata = () => {
-      set({ duration: audioElement.duration ?? 0 });
+      const duration = audioElement.duration ?? 0;
+      // Fade out audio
+      if (gainNode) {
+        const now = audioContext.currentTime;
+        gainNode.gain.cancelScheduledValues(now);
+        // ensure current gain is at current value (in case it's already >0)
+        // get current gain value by scheduling from current value
+        // fade down to 0
+        gainNode.gain.setValueAtTime(
+          gainNode.gain.value,
+          Math.round(duration - 10)
+        );
+        gainNode.gain.linearRampToValueAtTime(0, duration);
+      }
+      set({ duration });
       audioElement.removeEventListener("loadedmetadata", onLoadedMetadata);
     };
     audioElement.addEventListener("loadedmetadata", onLoadedMetadata);

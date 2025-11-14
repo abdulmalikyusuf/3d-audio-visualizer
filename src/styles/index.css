@@ -408,6 +408,32 @@ textarea {
   margin-bottom: 1rem;
 }
 
+.panel-header[data-state="closed"] {
+  margin-bottom: 0rem;
+}
+.panel-header-buttons {
+  display: flex;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.collapsible-trigger {
+  background: none;
+  border: none;
+  width: fit-content;
+  flex: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.collapsible-trigger svg {
+  width: 18px;
+  height: 18px;
+}
+
 .terminal-content {
   padding: 0.625rem;
   height: calc(100% - 31px);
@@ -659,4 +685,58 @@ textarea {
   height: 100%;
   pointer-events: none;
   z-index: 4;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: var(--accent-tertiary);
+  border-radius: 5px;
+  background-image: linear-gradient(
+    90deg,
+    var(--accent-primary) var(--progress),
+    var(--accent-tertiary) var(--progress)
+  );
+  /*background-size: 100% 100%; */
+  background-repeat: no-repeat;
+}
+
+input[type="range"]:disabled {
+  background-image: linear-gradient(45deg, grey, grey);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  -moz-appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  /* cursor: ew-resize; */
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px rgba(0, 0, 0, 0.06);
+  -webkit-transition: background 0.3s ease-in-out;
+  transition: background 0.3s ease-in-out;
+}
+input[type="range"]:disabled::-webkit-slider-thumb {
+  background-color: gray;
+}
+
+input[type="range"]::-webkit-slider-runnable-track,
+input[type="range"]::-moz-range-track,
+input[type="range"]::-ms-track {
+  -webkit-appearance: none;
+  appearance: none;
+  -moz-appearance: none;
+  box-shadow: none;
+  border: none;
+  background-color: black;
+}
+
+input[type="range"]::-moz-range-progress {
+  background-color: (--accent-primary);
+}
+input[type="range"]::-ms-fill-lower {
+  background-color: (--accent-primary);
 }
